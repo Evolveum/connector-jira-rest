@@ -564,7 +564,7 @@ public class ProjectObject extends JiraObjectsProcessing {
 	}
 
 	// parse projects from multiple json:
-	private boolean handleProjectObjects(JSONArray objectsArray, ResultsHandler handler, OperationOptions options, Boolean isRolesNeeded) {
+	private boolean handleProjectObjects(JSONArray objectsArray, ResultsHandler handler, OperationOptions options, Boolean isNonBasicParametersNeeded) {
 		/*
 		LOG.ok("Number of objects: {0}, pageResultsOffset: {1}, pageSize: {2} ", objectsArray.length(),
 				options == null ? "null" : options.getPagedResultsOffset(),
@@ -578,7 +578,7 @@ public class ProjectObject extends JiraObjectsProcessing {
 			ConnectorObject connectorObject = null;
 
 			// LOGGER.info("\n\tConverting Project...");
-			connectorObject = convertProjectToConnectorObject(object, isRolesNeeded);
+			connectorObject = convertProjectToConnectorObject(object, isNonBasicParametersNeeded);
 
 			boolean finish = false;
 			if (connectorObject != null) {
@@ -591,7 +591,7 @@ public class ProjectObject extends JiraObjectsProcessing {
 		return false;
 	}
 
-	private ConnectorObject convertProjectToConnectorObject(JSONObject project, Boolean isRolesNeeded) {
+	private ConnectorObject convertProjectToConnectorObject(JSONObject project, Boolean isNonBasicParametersNeeded) {
 		if (project == null) {
 			String exceptionMsg = "Conversion Project to Connector Object failed: JSONObject representing Project object is not provided or is empty";
 			LOG.error(exceptionMsg);
@@ -621,10 +621,12 @@ public class ProjectObject extends JiraObjectsProcessing {
 			avatarUrls.add((String) avatars.getString("48x48"));
 			builder.addAttribute(ATTR_AVATAR_URLS, avatarUrls);
 
-			byte[] avatarArray = getAvatar(avatarUrls.get(3), new ObjectClass(PROJECT_NAME));
-			// LOGGER.info("\n\tgetting avatar: {0}",
-			// avatarsArray[3].toString());
-			builder.addAttribute(ATTR_AVATAR_BYTE_ARRRAY, avatarArray);
+			if (isNonBasicParametersNeeded){
+				byte[] avatarArray = getAvatar(avatarUrls.get(3), new ObjectClass(PROJECT_NAME));
+				// LOGGER.info("\n\tgetting avatar: {0}",
+				// avatarsArray[3].toString());
+				builder.addAttribute(ATTR_AVATAR_BYTE_ARRRAY, avatarArray);
+			}
 		}
 
 		if (project.has(ATTR_LEAD)) {
@@ -634,7 +636,7 @@ public class ProjectObject extends JiraObjectsProcessing {
 
 		// get attribute roles and then project actors:
 		JSONObject attrRoles = null;
-		if (isRolesNeeded && !project.has(ATTR_ROLES)) { // JSON Object project does not contain
+		if (isNonBasicParametersNeeded && !project.has(ATTR_ROLES)) { // JSON Object project does not contain
 										// attribute Roles when getting all
 										// projects
 			if (uid != null) {
@@ -647,7 +649,7 @@ public class ProjectObject extends JiraObjectsProcessing {
 										// project
 			attrRoles = project.getJSONObject(ATTR_ROLES);
 		}
-		if (isRolesNeeded && attrRoles != null) {
+		if (isNonBasicParametersNeeded && attrRoles != null) {
 			// add role URIs to attributes:
 			String administratorsUrl = attrRoles.getString(ATTR_ADMINISTRATORS);
 			String developersUrl = attrRoles.getString(ATTR_DEVELOPERS);

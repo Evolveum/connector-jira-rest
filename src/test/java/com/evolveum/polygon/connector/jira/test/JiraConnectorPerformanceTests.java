@@ -35,9 +35,25 @@ import org.testng.annotations.Test;
  */
 public class JiraConnectorPerformanceTests extends JiraTestHelper {
 
-	private static final int COUNT = 10;
+	private static final int COUNT = 100;	//use even number!!
 	private static final String UPDATED = "updated";
+	//account:
+	private List<String> createdAccountNames = new ArrayList<>();
+	private List<String> updatedAccountNames = new ArrayList<>();
+	private List<Uid> createdAccountIds = new ArrayList<>();
+	private static final String USERNAME = "TestUser";
+	//group:
+	private List<Uid> createdGroupIds = new ArrayList<>();
+	private List<String> createdGroupNames = new ArrayList<>();
+	private static final String GROUPNAME = "TestGroup";
+	//project:
+	private List<Uid> createdProjectIds = new ArrayList<>();
+	private List<String> createdProjectNames = new ArrayList<>();
+	private List<String> createdProjectTypeKeys = new ArrayList<>();
+	private static final String PROJECT_NAME = "TestProject";
+	private static final String PROJECT_TYPE_KEY = "TSTPR";
 
+	
 	@Test(priority = 1)
 	public void initTest() {
 		jiraConnector.init(getConfiguration());
@@ -53,18 +69,6 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 	}
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ACCOUNT OBJECT CLASS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-	private List<Uid> createdAccountIds = new ArrayList<>();
-	private List<String> createdAccountNames = new ArrayList<>();
-	private List<String> updatedAccountNames = new ArrayList<>();
-	private static final String USERNAME = "TestUser";
-
-	private void createUsernamesList() {
-		for (int i = 0; i < COUNT; i++) {
-			createdAccountNames.add(USERNAME + i);
-			updatedAccountNames.add(UPDATED + USERNAME + i);
-		}
-	}
 
 	@Test(priority = 2)
 	public void createAccounts() {
@@ -86,7 +90,7 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 		password = new GuardedString("secret1".toCharArray());
 		int index = 0;
 		for (Uid uid : createdAccountIds) {
-			String name = UPDATED + createdAccountNames.get(index);
+			String name = updatedAccountNames.get(index);
 			Set<Attribute> accountAttributes = new HashSet<Attribute>();
 			accountAttributes.add(AttributeBuilder.build(Name.NAME, name));
 			Attribute attrPassword = AttributeBuilder.build("__PASSWORD__", password);
@@ -99,19 +103,19 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			index++;
 		}
 	}
-
+	
 	@Test(priority = 3)
 	public void listAccounts() {
 		Map<String, Object> operationOptions = new HashMap<String, Object>();
 		operationOptions.put("ALLOW_PARTIAL_ATTRIBUTE_VALUES", true);
 		operationOptions.put(OperationOptions.OP_PAGED_RESULTS_OFFSET, 1);
-		operationOptions.put(OperationOptions.OP_PAGE_SIZE, 100);
+		operationOptions.put(OperationOptions.OP_PAGE_SIZE, COUNT/2);
 		OperationOptions options = new OperationOptions(operationOptions);
-		// get all groups:
+		// get all users:
 		accountResults.clear();
 		jiraConnector.executeQuery(accountObjectClass, null, accountHandler, options);
-		if (accountResults.size() >= COUNT) {
-			LOG.ok("\n\tListed " + accountResults.size() + " groups.\n");
+		if (accountResults.size() >= COUNT/2) {
+			LOG.ok("\n\tListed " + accountResults.size() + " accounts.\n");
 		} else {
 			throw new ConnectorException("Not all accounts have been listed.");
 		}
@@ -147,7 +151,9 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			jiraConnector.removeAttributeValues(accountObjectClass, uid, accountAttributes, null); 
 		} 
 	}
-	 
+	
+	/*
+	//Too many users adding to too many groups
 	@Test(priority = 11) public void addUsersToGroups(){ 
 		for (Uid uid : createdAccountIds){ Set<Attribute> accountAttributes = new HashSet<Attribute>();
 			accountAttributes.add(AttributeBuilder.build("groups", createdGroupNames)); 
@@ -162,18 +168,8 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			jiraConnector.removeAttributeValues(accountObjectClass, uid, accountAttributes, null); 
 		} 
 	}
-	 
+	*/
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~GROUP OBJECT CLASS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-	private List<Uid> createdGroupIds = new ArrayList<>();
-	private List<String> createdGroupNames = new ArrayList<>();
-	private static final String GROUPNAME = "TestGroup";
-
-	private void createGroupNamesList() {
-		for (int i = 0; i < COUNT; i++) {
-			createdGroupNames.add(GROUPNAME + i);
-		}
-	}
 
 	@Test(priority = 4)
 	public void createGroups() {
@@ -198,19 +194,6 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 	}
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~PROJECT OBJECT CLASS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-	private List<Uid> createdProjectIds = new ArrayList<>();
-	private List<String> createdProjectNames = new ArrayList<>();
-	private List<String> createdProjectTypeKeys = new ArrayList<>();
-	private static final String PROJECT_NAME = "TestProject";
-	private static final String PROJECT_TYPE_KEY = "TSTPR";
-
-	private void createProjectNamesList() {
-		for (int i = 0; i < COUNT; i++) {
-			createdProjectNames.add(PROJECT_NAME + i);
-			createdProjectTypeKeys.add(PROJECT_TYPE_KEY + i);
-		}
-	}
 
 	@Test(priority = 13)
 	public void createProjects() {
@@ -238,7 +221,7 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			projectAttributes.add(AttributeBuilder.build(Name.NAME, name));
 			projectAttributes.add(AttributeBuilder.build("key", typeKey));
 			projectAttributes.add(AttributeBuilder.build("projectTypeKey", "software"));
-			projectAttributes.add(AttributeBuilder.build("lead", UPDATED + createdAccountNames.get(index)));
+			projectAttributes.add(AttributeBuilder.build("lead", updatedAccountNames.get(index)));
 			// update project:
 			jiraConnector.update(projectObjectClass, uid, projectAttributes, options);
 			index++;
@@ -300,7 +283,9 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 		projectAttributes.add(AttributeBuilder.build("Administrators.users", updatedAccountNames));
 		jiraConnector.removeAttributeValues(projectObjectClass, createdProjectIds.get(0), projectAttributes, null);
 	}
-
+	
+	/*
+	//Too many users adding to too many projects
 	@Test(priority = 19)
 	public void addActorsToProjects() {
 		Set<Attribute> projectAttributes = new HashSet<Attribute>();
@@ -324,6 +309,7 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			jiraConnector.removeAttributeValues(projectObjectClass, uid, projectAttributes, null);
 		}
 	}
+	*/
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~DELETE OBJECTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 	@Test(priority = 35)
@@ -360,6 +346,13 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 	public void disposeTest() {
 		jiraConnector.dispose();
 	}
+	
+	private void createProjectNamesList() {
+		for (int i = 0; i < COUNT; i++) {
+			createdProjectNames.add(PROJECT_NAME + i);
+			createdProjectTypeKeys.add(PROJECT_TYPE_KEY + i);
+		}
+	}
 
 	private void projectsCleanUp() {
 		projectResults.clear();
@@ -379,6 +372,14 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 			}
 		}
 	}
+	
+	private void createUsernamesList() {
+		for (int i = 0; i < COUNT; i++) {
+			createdAccountNames.add(USERNAME + i);
+			updatedAccountNames.add(UPDATED + USERNAME + i);
+		}
+	}
+	
 	private void accountsCleanUp() {
 		accountResults.clear();
 		jiraConnector.executeQuery(accountObjectClass, null, accountHandler, options);
@@ -397,6 +398,12 @@ public class JiraConnectorPerformanceTests extends JiraTestHelper {
 					}
 				}
 			}
+		}
+	}
+	
+	private void createGroupNamesList() {
+		for (int i = 0; i < COUNT; i++) {
+			createdGroupNames.add(GROUPNAME + i);
 		}
 	}
 	private void groupsCleanUp() {

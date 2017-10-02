@@ -137,6 +137,7 @@ public class GroupObject extends JiraObjectsProcessing {
 				// if want to get all groups use picker
 				// getUri = getURIBuilder();
 				getUri.setPath(URI_BASE_PATH + URI_GROUPS_PICKER_PATH);
+				getUri.addParameter(PARAM_MAX_RESULTS, "1000");
 				request = new HttpGet(getUri.build());
 				object = callRequest(request, true, CONTENT_TYPE_JSON);
 				objectsArray = object.getJSONArray(ATTR_GROUPS);
@@ -194,6 +195,7 @@ public class GroupObject extends JiraObjectsProcessing {
 					// getUri = getURIBuilder();
 					getUri.setPath(URI_BASE_PATH + URI_GROUPS_PICKER_PATH);
 					getUri.addParameter(PARAM_QUERY, name.getNameValue());
+					getUri.addParameter(PARAM_MAX_RESULTS, "1000");
 					request = new HttpGet(getUri.build());
 					object = callRequest(request, true, CONTENT_TYPE_JSON);
 					objectsArray = object.getJSONArray(ATTR_GROUPS);

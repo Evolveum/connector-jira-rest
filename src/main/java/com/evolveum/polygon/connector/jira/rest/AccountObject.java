@@ -324,31 +324,8 @@ public class AccountObject extends JiraObjectsProcessing {
 		JSONArray objectsArray;
 		// get all users:
 		if (query == null) {
-			try {
-				// if want to get all user use parameter '.'
-				// getUri = getURIBuilder();
-				getUri.setPath(URI_BASE_PATH + URI_USER_PATH + URI_SEARCH_PATH);
-				getUri.addParameter(PARAM_USERNAME, PARAM_GET_ALL_USERS);
-				if (options.getPagedResultsOffset() != null || options.getPageSize() != null) {
-					int pageNumber = options.getPagedResultsOffset();
-					int usersPerPage = options.getPageSize();
-					int startAt = (pageNumber * usersPerPage) - usersPerPage;
-					// LOGGER.info("\n\tpage: {0}, users per page {1}, start
-					// at: {2}", pageNumber, usersPerPage, startAt);
-					getUri.addParameter(PARAM_MAX_RESULTS, String.valueOf(usersPerPage));
-					getUri.addParameter(PARAM_START_AT, String.valueOf(startAt));
-				}
-
-				request = new HttpGet(getUri.build());
-				objectsArray = callRequest(request);
-				handleUserObjects(objectsArray, handler, options);
-			} catch (URISyntaxException e) {
-				StringBuilder exceptionMsg = new StringBuilder();
-				exceptionMsg.append("Get operation failed: problem occurred during executing URI: ").append(getUri)
-						.append(", during getting all users.\n\t").append(e.getLocalizedMessage());
-				LOG.error(exceptionMsg.toString());
-				throw new ConnectorException(exceptionMsg.toString());
-			}
+			objectsArray = getAllUsers(options);
+			handleUserObjects(objectsArray, handler, options, false);
 		} else
 
 		// get user by username:
@@ -363,7 +340,7 @@ public class AccountObject extends JiraObjectsProcessing {
 					getUri.addParameter(ATTR_EXPAND, ATTR_APPLICAION_ROLES);
 					request = new HttpGet(getUri.build());
 					JSONObject user = callRequest(request, true, CONTENT_TYPE_JSON);
-					ConnectorObject connectorObject = convertUserToConnectorObject(user);
+					ConnectorObject connectorObject = convertUserToConnectorObject(user, true);
 					handler.handle(connectorObject);
 				} catch (URISyntaxException e) {
 					StringBuilder exceptionMsg = new StringBuilder();
@@ -389,7 +366,7 @@ public class AccountObject extends JiraObjectsProcessing {
 					getUri.addParameter(ATTR_EXPAND, ATTR_APPLICAION_ROLES);
 					request = new HttpGet(getUri.build());
 					JSONObject user = callRequest(request, true, CONTENT_TYPE_JSON);
-					ConnectorObject connectorObject = convertUserToConnectorObject(user);
+					ConnectorObject connectorObject = convertUserToConnectorObject(user, true);
 					handler.handle(connectorObject);
 				} catch (URISyntaxException e) {
 					StringBuilder exceptionMsg = new StringBuilder();
@@ -406,14 +383,14 @@ public class AccountObject extends JiraObjectsProcessing {
 		if (query instanceof StartsWithFilter) {
 			attr = ((StartsWithFilter) query).getAttribute();
 			JSONArray filteredArray = startsWithFiltering(query, attr, options, ObjectClass.ACCOUNT_NAME);
-			handleUserObjects(filteredArray, handler, options);
+			handleUserObjects(filteredArray, handler, options, true);
 		} else
 		// search users using containsFilter, but in fact it is
 		// startsWithFilter because Jira does not allow ContainsFilter:
 		if (query instanceof ContainsFilter) {
 			attr = ((ContainsFilter) query).getAttribute();
 			JSONArray filteredArray = startsWithFiltering(query, attr, options, ObjectClass.ACCOUNT_NAME);
-			handleUserObjects(filteredArray, handler, options);
+			handleUserObjects(filteredArray, handler, options, true);
 		} else {
 			StringBuilder exceptionMsg = new StringBuilder();
 			exceptionMsg.append("\n\tUnsuported query filter for Account Object Class '").append(query)
@@ -422,11 +399,63 @@ public class AccountObject extends JiraObjectsProcessing {
 			LOG.error(exceptionMsg.toString());
 			throw new NoSuchMethodError(exceptionMsg.toString());
 		}
+	}
+	
+	private JSONArray getAllUsers(OperationOptions options){
+		HttpGet request;
+		URIBuilder getUri = getURIBuilder();
+		JSONArray users = new JSONArray(), allUsers = new JSONArray();
+		Boolean isPaginationRequested = false;
+		int usersPerPage = 50, startAt = 0;
+		getUri.setPath(URI_BASE_PATH + URI_USER_PATH + URI_SEARCH_PATH);
+		// if want to get all user use parameter '.'
+		getUri.addParameter(PARAM_USERNAME, PARAM_GET_ALL_USERS);
+		try {
+			if (options.getPagedResultsOffset() != null || options.getPageSize() != null) {
+				isPaginationRequested = true;
+				int pageNumber = options.getPagedResultsOffset();
+				usersPerPage = options.getPageSize();				
+				startAt = (pageNumber * usersPerPage) - usersPerPage;
+				// LOGGER.info("\n\tpage: {0}, users per page {1}, start at: {2}", pageNumber, usersPerPage, startAt);
+			}
 
+			getUri.addParameter(PARAM_MAX_RESULTS, String.valueOf(usersPerPage));
+			getUri.addParameter(PARAM_START_AT, String.valueOf(startAt));
+			request = new HttpGet(getUri.build());
+			users = callRequest(request);
+			
+			allUsers = concatJSONArrays(users, allUsers);
+			
+			while( users.length()==50 && !isPaginationRequested){
+				startAt = startAt+50;
+				getUri.clearParameters();
+				getUri.addParameter(PARAM_USERNAME, PARAM_GET_ALL_USERS);
+				getUri.addParameter(PARAM_MAX_RESULTS, String.valueOf(usersPerPage));
+				getUri.addParameter(PARAM_START_AT, String.valueOf(startAt));
+				request = new HttpGet(getUri.build());
+				users = callRequest(request);
+				allUsers = concatJSONArrays(users, allUsers);
+			}
+			return allUsers;
+		} catch (URISyntaxException e) {
+			StringBuilder exceptionMsg = new StringBuilder();
+			exceptionMsg.append("Get operation failed: problem occurred during executing URI: ").append(getUri)
+					.append(", during getting all users.\n\t").append(e.getLocalizedMessage());
+			LOG.error(exceptionMsg.toString());
+			throw new ConnectorException(exceptionMsg.toString());
+		}
+	}
+	
+	//put objects of array1 to the end of array2
+	private JSONArray concatJSONArrays(JSONArray array1, JSONArray array2){
+		for (Object obj : array1){
+			array2.put(obj);
+		}
+		return array2;
 	}
 
 	// parse user object from multiple json:
-	private boolean handleUserObjects(JSONArray objectsArray, ResultsHandler handler, OperationOptions options) {
+	private boolean handleUserObjects(JSONArray objectsArray, ResultsHandler handler, OperationOptions options, Boolean isNonBasicParametersNeeded) {
 		/*
 		LOG.ok("Number of objects: {0}, pageResultsOffset: {1}, pageSize: {2} ", objectsArray.length(),
 				options == null ? "null" : options.getPagedResultsOffset(),
@@ -440,7 +469,7 @@ public class AccountObject extends JiraObjectsProcessing {
 			ConnectorObject connectorObject = null;
 
 			// LOGGER.info("\n\tConverting Account...");
-			connectorObject = convertUserToConnectorObject(object);
+			connectorObject = convertUserToConnectorObject(object, isNonBasicParametersNeeded);
 
 			boolean finish = false;
 			if (connectorObject != null) {
@@ -453,7 +482,7 @@ public class AccountObject extends JiraObjectsProcessing {
 		return false;
 	}
 
-	private ConnectorObject convertUserToConnectorObject(JSONObject user) {
+	private ConnectorObject convertUserToConnectorObject(JSONObject user, Boolean isNonBasicParametersNeeded) {
 		if (user == null) {
 			String exceptionMsg = "Conversion to Connector Object failed: JSONObject representing account object is not provided or is empty"; 
 			LOG.error(exceptionMsg);
@@ -493,10 +522,11 @@ public class AccountObject extends JiraObjectsProcessing {
 			avatarsArray.add((String) avatars.getString("32x32"));
 			avatarsArray.add((String) avatars.getString("48x48"));
 			builder.addAttribute(ATTR_AVATAR_URLS, avatarsArray.toArray());
-
-			byte[] avatarArray = getAvatar(avatarsArray.get(3), new ObjectClass(ObjectClass.ACCOUNT_NAME));
-			builder.addAttribute(ATTR_AVATAR_BYTE_ARRRAY, avatarArray);
-
+			
+			if (isNonBasicParametersNeeded){
+				byte[] avatarArray = getAvatar(avatarsArray.get(3), new ObjectClass(ObjectClass.ACCOUNT_NAME));
+				builder.addAttribute(ATTR_AVATAR_BYTE_ARRRAY, avatarArray);
+			}
 		}
 
 		if (user.has(ATTR_GROUPS)) {
